@@ -710,29 +710,20 @@ async function doSearch() {
   try {
     const apiUrl = `https://data4library.kr/api/srchBooks?authKey=${AUTH_KEY}&title=${encodeURIComponent(kw)}&pageSize=5&format=json`;
 
-    // 프록시 순차 시도
-    const proxies = [
-      u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      u => `https://thingproxy.freeboard.io/fetch/${u}`,
-      u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    ];
+    const PROXY = 'https://gm-library-drab.vercel.app/api/proxy';
+    const proxyUrl = `${PROXY}?url=${encodeURIComponent(apiUrl)}`;
+    dbLog(`📡 Vercel 프록시 호출: ${proxyUrl.slice(0,80)}...`);
 
     let data = null;
-    for (let i = 0; i < proxies.length; i++) {
-      const proxyUrl = proxies[i](apiUrl);
-      dbLog(`📡 프록시 ${i+1} 시도: ${proxyUrl.slice(0,60)}...`);
-      try {
-        const res = await fetch(proxyUrl);
-        dbLog(`📥 HTTP ${res.status}`, res.ok ? 'green' : 'red');
-        if (!res.ok) continue;
-        const text = await res.text();
-        dbLog(`📄 응답: ${text.slice(0,100)}`);
-        data = JSON.parse(text);
-        dbLog(`✅ 프록시 ${i+1} 성공!`, 'green');
-        break;
-      } catch(pe) {
-        dbLog(`❌ 프록시 ${i+1} 실패: ${pe.message}`, 'red');
-      }
+    try {
+      const res = await fetch(proxyUrl);
+      dbLog(`📥 HTTP ${res.status}`, res.ok ? 'green' : 'red');
+      const text = await res.text();
+      dbLog(`📄 응답: ${text.slice(0,100)}`);
+      data = JSON.parse(text);
+      dbLog(`✅ 성공!`, 'green');
+    } catch(pe) {
+      dbLog(`❌ 실패: ${pe.message}`, 'red');
     }
 
     ld.style.display = 'none';
@@ -820,7 +811,8 @@ async function checkExist(isbn13, bookName) {
   }
   try {
     const apiUrl = `https://data4library.kr/api/bookExist?authKey=${AUTH_KEY}&libCode=${selLibCode}&isbn13=${isbn13}&format=json`;
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+    const PROXY = 'https://gm-library-drab.vercel.app/api/proxy';
+    const proxyUrl = `${PROXY}?url=${encodeURIComponent(apiUrl)}`;
     const res = await fetch(proxyUrl);
     const data = await res.json();
     ld.style.display = 'none';
