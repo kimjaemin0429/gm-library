@@ -791,7 +791,7 @@ function renderBooks(books, total) {
 
     if (curPage < totalPages) {
       const next = document.createElement('button');
-      next.textContent = '다음 ▶';
+      next.textContent = '다음페이지 ▶';
       next.style.cssText = 'flex:1;padding:14px;background:#FFF3E0;border:3px solid #FFCC80;border-radius:16px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;color:#E64A19;';
       next.onclick = () => { curPage++; fetchBooks(); };
       paging.appendChild(next);
