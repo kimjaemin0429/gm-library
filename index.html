@@ -603,6 +603,11 @@ body {
 let AUTH_KEY = '31d4be51b69d5d56eb0d654d719c77fefefdd6cdd193b8a127fe5b7ccfbb99f0';
 let selLibCode = '';
 let selLibName = '';
+let curKeyword = '';
+let curPage = 1;
+let totalFound = 0;
+const PAGE_SIZE = 10;
+const PROXY = 'https://gm-library-drab.vercel.app/api/proxy';
 
 /* ── 관리자 패널 ── */
 function toggleAdmin() {
@@ -690,7 +695,12 @@ function dbLog(msg, color='#333') {
 async function doSearch() {
   const kw = document.getElementById('searchInput').value.trim();
   if (!kw) { document.getElementById('searchInput').focus(); return; }
+  curKeyword = kw;
+  curPage = 1;
+  await fetchBooks();
+}
 
+async function fetchBooks() {
   const bl = document.getElementById('bookList');
   const ld = document.getElementById('loadingSearch');
   bl.style.display = 'none'; bl.innerHTML = '';
@@ -698,21 +708,18 @@ async function doSearch() {
   resetStep3();
   setBubble(3);
 
-  dbLog(`🔍 검색 시작: "${kw}"`);
-  dbLog(`🔑 AUTH_KEY: ${AUTH_KEY ? AUTH_KEY.slice(0,8)+'...' : '없음!'}`);
+  dbLog(`🔍 검색: "${curKeyword}" (${curPage}페이지)`);
 
   if (!AUTH_KEY) {
     await sleep(900);
     ld.style.display = 'none';
-    renderDummyBooks(kw);
+    renderDummyBooks(curKeyword);
     return;
   }
   try {
-    const apiUrl = `https://data4library.kr/api/srchBooks?authKey=${AUTH_KEY}&title=${encodeURIComponent(kw)}&pageSize=5&format=json`;
-
-    const PROXY = 'https://gm-library-drab.vercel.app/api/proxy';
+    const apiUrl = `https://data4library.kr/api/srchBooks?authKey=${AUTH_KEY}&title=${encodeURIComponent(curKeyword)}&pageSize=${PAGE_SIZE}&pageNo=${curPage}&format=json`;
     const proxyUrl = `${PROXY}?url=${encodeURIComponent(apiUrl)}`;
-    dbLog(`📡 Vercel 프록시 호출: ${proxyUrl.slice(0,80)}...`);
+    dbLog(`📡 호출: ${proxyUrl.slice(0,80)}...`);
 
     let data = null;
     try {
@@ -727,21 +734,31 @@ async function doSearch() {
     }
 
     ld.style.display = 'none';
-    if (!data) { renderNoBook(kw); return; }
+    if (!data) { renderNoBook(curKeyword); return; }
+
+    totalFound = parseInt(data?.response?.numFound) || 0;
     const docs = data?.response?.docs;
-    dbLog(`📚 결과: ${docs?.length ?? 0}권`, docs?.length ? 'green' : 'orange');
-    if (!docs || !docs.length) { renderNoBook(kw); return; }
-    renderBooks(docs.map(d => d.doc));
+    dbLog(`📚 전체 ${totalFound}권 / 이번 ${docs?.length ?? 0}권`, docs?.length ? 'green' : 'orange');
+    if (!docs || !docs.length) { renderNoBook(curKeyword); return; }
+    renderBooks(docs.map(d => d.doc), totalFound);
   } catch(e) {
     dbLog(`❌ 전체 실패: ${e.message}`, 'red');
     ld.style.display = 'none';
-    renderNoBook(kw);
+    renderNoBook(curKeyword);
   }
 }
 
-function renderBooks(books) {
+function renderBooks(books, total) {
   const bl = document.getElementById('bookList');
   bl.innerHTML = '';
+
+  // 결과 수 표시
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const counter = document.createElement('div');
+  counter.style.cssText = 'font-size:13px;font-weight:800;color:#90A4AE;padding:4px 2px 10px;';
+  counter.textContent = `📚 총 ${total}권 찾았어요! (${curPage}/${totalPages} 페이지)`;
+  bl.appendChild(counter);
+
   books.forEach(b => {
     const el = document.createElement('div');
     el.className = 'book-item';
@@ -758,6 +775,31 @@ function renderBooks(books) {
       <span class="book-tap">👆</span>`;
     bl.appendChild(el);
   });
+
+  // 페이징 버튼
+  if (totalPages > 1) {
+    const paging = document.createElement('div');
+    paging.style.cssText = 'display:flex;gap:10px;justify-content:center;margin-top:14px;';
+
+    if (curPage > 1) {
+      const prev = document.createElement('button');
+      prev.textContent = '◀ 이전';
+      prev.style.cssText = 'flex:1;padding:14px;background:#FFF3E0;border:3px solid #FFCC80;border-radius:16px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;color:#E64A19;';
+      prev.onclick = () => { curPage--; fetchBooks(); };
+      paging.appendChild(prev);
+    }
+
+    if (curPage < totalPages) {
+      const next = document.createElement('button');
+      next.textContent = '다음 ▶';
+      next.style.cssText = 'flex:1;padding:14px;background:#FFF3E0;border:3px solid #FFCC80;border-radius:16px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;color:#E64A19;';
+      next.onclick = () => { curPage++; fetchBooks(); };
+      paging.appendChild(next);
+    }
+
+    bl.appendChild(paging);
+  }
+
   bl.style.display = 'flex';
 }
 
